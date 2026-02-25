@@ -69,6 +69,7 @@
     <script src="weibo.js" defer></script>
     <script src="date.js" defer></script>
     <script src="studio.js" defer></script>
+    <script src="sw.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/darkreader@4.9.84/darkreader.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
@@ -51263,7 +51264,11 @@ ${innerVoicePromptPart}
           console.log(`[Minimax TTS] Request to ${requestUrl}`, requestBody);
 
           try {
-            const response = await fetch(`${requestUrl}?GroupId=${groupId}`, {
+            // 使用 CORS 代理绕过域名白名单限制
+            const proxyUrl = 'https://api.allorigins.win/raw?url=';
+            const targetUrl = `${requestUrl}?GroupId=${groupId}`;
+            
+            const response = await fetch(proxyUrl + encodeURIComponent(targetUrl), {
               method: "POST",
               headers: {
                 Authorization: `Bearer ${apiKey}`,
