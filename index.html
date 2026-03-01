@@ -4802,22 +4802,12 @@
                 </span>
                 <span
                   class="action-btn"
-                  id="generate-chat-message-btn"
-                  title="生成新聊天"
+                  id="random-refresh-chats-btn"
+                  title="随机刷新聊天"
                 >
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <path
-                      d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"
-                    />
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M23 4v6h-6M1 20v-6h6"/>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L20.5 10M3.5 14a9 9 0 0 1 14.85 3.36L20.5 14"/>
                   </svg>
                 </span>
               </div>
@@ -5791,59 +5781,6 @@
         </div>
       </div>
     </div>
-    <!-- “查手机”功能-生成聊天对象选择弹窗 -->
-    <div id="chat-gen-selector-modal" class="modal">
-      <div class="modal-content" style="height: 70%">
-        <div class="modal-header">
-          <span>选择聊天对象</span>
-        </div>
-        <div
-          class="modal-body"
-          style="padding: 0; display: flex; flex-direction: column"
-        >
-          <!-- 顶部：随机选项 -->
-          <div
-            style="
-              padding: 15px;
-              border-bottom: 1px solid var(--border-color);
-              background: var(--secondary-bg);
-            "
-          >
-            <label class="toggle-switch-label" style="margin: 0">
-              <span class="toggle-switch-text" style="font-weight: bold"
-                >🎲 随机生成 (AI决定)</span
-              >
-              <input type="checkbox" id="chat-gen-random-checkbox" checked />
-              <span class="toggle-switch-slider"></span>
-            </label>
-            <p
-              style="
-                font-size: 12px;
-                color: var(--text-secondary);
-                margin-top: 5px;
-                margin-bottom: 0;
-              "
-            >
-              关闭后可指定下方特定角色/NPC。
-            </p>
-          </div>
-
-          <!-- 列表：特定角色选择 -->
-          <div
-            id="chat-gen-list"
-            class="contact-picker-list"
-            style="flex-grow: 1; opacity: 0.5; pointer-events: none"
-          >
-            <!-- 列表项由JS生成 -->
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button class="cancel" id="cancel-chat-gen-btn">取消</button>
-          <button class="save" id="confirm-chat-gen-btn">开始生成</button>
-        </div>
-      </div>
-    </div>
-
     <div id="generation-overlay" class="modal">
       <div class="loading-content">
         <!-- 这是一个粉色的猫爪爪 -->
@@ -19007,6 +18944,7 @@ lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer
         let editingPersonaPresetId = null;
         let activeCharPhonePresetId = null; // 用于追踪角色手机外观预设的选择
         let activeCharacterPhoneId = null;
+        window.activeCharacterPhoneId = null; // 供 my-phone-ui.js 等外部脚本使用
         let waimaiTimers = {}; // 用于存储外卖倒计时
         let editingSpriteGroupId = null;
         let activeMessageTimestamp = null;
@@ -44597,6 +44535,7 @@ ${innerVoicePromptPart}
 
         function openCharacterPhone(chatId) {
           activeCharacterPhoneId = chatId;
+          window.activeCharacterPhoneId = chatId;
           const chat = state.chats[chatId];
           if (!chat) return;
 
@@ -44743,86 +44682,8 @@ ${innerVoicePromptPart}
           });
         }
 
-        /**
-         * 打开生成聊天对象的选择弹窗
-         */
-        function openChatGenerationModal() {
-          const listEl = document.getElementById("chat-gen-list");
-          listEl.innerHTML = "";
-
-          if (!activeCharacterPhoneId) return;
-          const currentChat = state.chats[activeCharacterPhoneId];
-
-          // 1. 重置 UI 状态
-          const randomCheckbox = document.getElementById(
-            "chat-gen-random-checkbox",
-          );
-          randomCheckbox.checked = true; // 默认随机
-          listEl.style.opacity = "0.5";
-          listEl.style.pointerEvents = "none";
-
-          // 2. 收集所有可选项 (NPC + 其他主角)
-          const options = [];
-
-          // A. 当前角色的 NPC 库
-          if (currentChat.npcLibrary) {
-            currentChat.npcLibrary.forEach((npc) => {
-              options.push({
-                type: "NPC",
-                name: npc.name,
-                persona: npc.persona,
-                avatar: npc.avatar || defaultGroupMemberAvatar,
-              });
-            });
-          }
-
-          // B. 其他主角 (state.chats 里的单聊角色，排除自己)
-          Object.values(state.chats).forEach((otherChat) => {
-            if (!otherChat.isGroup && otherChat.id !== currentChat.id) {
-              options.push({
-                type: "角色",
-                name: otherChat.name,
-                persona: otherChat.settings.aiPersona,
-                avatar: otherChat.settings.aiAvatar || defaultAvatar,
-              });
-            }
-          });
-
-          if (options.length === 0) {
-            listEl.innerHTML =
-              '<p style="text-align:center; padding:20px; color:#888;">暂无可选角色/NPC，请使用随机模式。</p>';
-          } else {
-            options.forEach((opt) => {
-              const item = document.createElement("div");
-              item.className = "contact-picker-item"; // 复用现有的样式
-              // 将人设经过简单处理存入 dataset (避免太长或有特殊字符)
-              const safePersona = (opt.persona || "").replace(/"/g, "&quot;");
-
-              item.innerHTML = `
-			                                <input type="checkbox" data-name="${opt.name}" data-persona="${safePersona}" style="margin-right: 10px;">
-			                                <img src="${opt.avatar}" class="avatar">
-			                                <div style="display:flex; flex-direction:column;">
-			                                    <span class="name">${opt.name}</span>
-			                                    <span style="font-size:12px; color:#888;">${opt.type}</span>
-			                                </div>
-			                            `;
-
-              // 点击整行触发 checkbox
-              item.addEventListener("click", (e) => {
-                if (e.target.tagName !== "INPUT") {
-                  const cb = item.querySelector("input");
-                  cb.checked = !cb.checked;
-                }
-              });
-
-              listEl.appendChild(item);
-            });
-          }
-
-          document
-            .getElementById("chat-gen-selector-modal")
-            .classList.add("visible");
-        }
+        /** 已移除：指定NPC/角色生成聊天功能，保留空函数避免残留引用报错 */
+        function openChatGenerationModal() {}
 
         /**
          * 为“查手机”功能单独生成某一项数据的通用函数
@@ -46472,6 +46333,17 @@ ${innerVoicePromptPart}
             listEl.appendChild(itemEl);
           });
         }
+
+        // 供 my-phone-ui.js 等外部脚本调用的渲染函数
+        window.renderCharacterChatList = renderCharacterChatList;
+        window.renderCharacterMemos = renderCharacterMemos;
+        window.renderCharacterShoppingCart = renderCharacterShoppingCart;
+        window.renderCharacterBrowser = renderCharacterBrowser;
+        window.renderCharacterPhotoAlbum = renderCharacterPhotoAlbum;
+        window.renderCharacterBank = renderCharacterBank;
+        window.renderCharacterTrajectory = renderCharacterTrajectory;
+        window.renderCharacterAppUsage = renderCharacterAppUsage;
+        window.renderCharacterDiary = renderCharacterDiary;
 
         /**
          * 【日记】独立刷新，生成新的日记条目
@@ -58878,8 +58750,8 @@ ${innerVoicePromptPart}
               if (actionBtn) {
                 switch (actionBtn.id) {
                   // --- 单独生成按钮 ---
-                  case "generate-chat-message-btn":
-                    openChatGenerationModal();
+                  case "random-refresh-chats-btn":
+                    generateCharacterPhoneDataSegment("chats", null);
                     break;
                   case "generate-cart-item-btn":
                     generateCharacterPhoneDataSegment("shoppingCart");
@@ -67916,65 +67788,6 @@ ${innerVoicePromptPart}
               }
             });
 
-          // 查手机-生成聊天选择器事件绑定
-          document
-            .getElementById("cancel-chat-gen-btn")
-            .addEventListener("click", () => {
-              document
-                .getElementById("chat-gen-selector-modal")
-                .classList.remove("visible");
-            });
-
-          // 随机开关切换时，启用/禁用列表
-          document
-            .getElementById("chat-gen-random-checkbox")
-            .addEventListener("change", (e) => {
-              const list = document.getElementById("chat-gen-list");
-              if (e.target.checked) {
-                list.style.opacity = "0.5";
-                list.style.pointerEvents = "none";
-                // 清空所有勾选
-                list
-                  .querySelectorAll('input[type="checkbox"]')
-                  .forEach((cb) => (cb.checked = false));
-              } else {
-                list.style.opacity = "1";
-                list.style.pointerEvents = "auto";
-              }
-            });
-
-          document
-            .getElementById("confirm-chat-gen-btn")
-            .addEventListener("click", () => {
-              const isRandom = document.getElementById(
-                "chat-gen-random-checkbox",
-              ).checked;
-              let selectedTargets = null;
-
-              if (!isRandom) {
-                // 如果不是随机，收集选中的对象
-                selectedTargets = [];
-                document
-                  .querySelectorAll("#chat-gen-list input:checked")
-                  .forEach((checkbox) => {
-                    selectedTargets.push({
-                      name: checkbox.dataset.name,
-                      persona: checkbox.dataset.persona,
-                    });
-                  });
-
-                if (selectedTargets.length === 0) {
-                  alert("请至少选择一个聊天对象，或者开启随机模式。");
-                  return;
-                }
-              }
-
-              document
-                .getElementById("chat-gen-selector-modal")
-                .classList.remove("visible");
-              // 调用生成函数，传入选中的目标（如果是随机则为null）
-              generateCharacterPhoneDataSegment("chats", selectedTargets);
-            });
           // 快捷回复事件绑定
           document
             .getElementById("quick-reply-btn")

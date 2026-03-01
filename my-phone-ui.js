@@ -8,7 +8,7 @@
 // ======================================================================================
 
 function getChat() {
-    return state.chats[activeCharacterPhoneId];
+    return state.chats[window.activeCharacterPhoneId];
 }
 
 function getPhoneData() {
@@ -24,18 +24,20 @@ async function saveAndRefresh(dataType) {
         await saveChatToDb(chat.id);
     }
     
-    // 刷新对应的 UI
-    switch(dataType) {
-        case 'memos': renderCharacterMemos(); break;
-        case 'shoppingCart': renderCharacterShoppingCart(); break;
-        case 'browserHistory': renderCharacterBrowser(); break;
-        case 'photoAlbum': renderCharacterPhotoAlbum(); break;
-        case 'bank': renderCharacterBank(); break;
-        case 'trajectory': renderCharacterTrajectory(); break;
-        case 'appUsage': renderCharacterAppUsage(); break;
-        case 'diary': renderCharacterDiary(); break;
-        case 'chats': renderCharacterChatList(); break;
-    }
+    // 刷新对应的 UI（渲染函数定义在 index.html，通过 window 调用）
+    const renderers = {
+        memos: window.renderCharacterMemos,
+        shoppingCart: window.renderCharacterShoppingCart,
+        browserHistory: window.renderCharacterBrowser,
+        photoAlbum: window.renderCharacterPhotoAlbum,
+        bank: window.renderCharacterBank,
+        trajectory: window.renderCharacterTrajectory,
+        appUsage: window.renderCharacterAppUsage,
+        diary: window.renderCharacterDiary,
+        chats: window.renderCharacterChatList
+    };
+    const fn = renderers[dataType];
+    if (typeof fn === 'function') fn();
 }
 
 function showModal(html, title, onSave) {
